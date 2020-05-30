@@ -1,14 +1,15 @@
 #include <catch2/catch.hpp>
+#include <parser_test/algorithm.hpp>
 
-constexpr unsigned int Factorial(unsigned int number)
+constexpr auto test_count_to_last()
 {
-  return number <= 1 ? number : Factorial(number - 1) * number;
+  std::string_view input{ "hello\nworld" };
+  return count_to_last(input.begin(), input.end(), '\n');
 }
 
-TEST_CASE("Factorials are computed with constexpr", "[factorial]")
+
+TEST_CASE("count_to_last works in constexpr context")
 {
-  STATIC_REQUIRE(Factorial(1) == 1);
-  STATIC_REQUIRE(Factorial(2) == 2);
-  STATIC_REQUIRE(Factorial(3) == 6);
-  STATIC_REQUIRE(Factorial(10) == 3628800);
+  STATIC_REQUIRE(test_count_to_last().first == 1);
+  STATIC_REQUIRE(test_count_to_last().second == std::next(input.begin(), 6));
 }

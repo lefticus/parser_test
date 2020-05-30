@@ -7,6 +7,7 @@
 #include <docopt/docopt.h>
 
 #include <iostream>
+#include <parser_test/parser.hpp>
 
 static constexpr auto USAGE =
   R"(Naval Fate.
@@ -42,4 +43,22 @@ int main(int argc, const char **argv)
   spdlog::info("Hello, {}!", "World");
 
   fmt::print("Hello, from {}\n", "{fmt}");
+
+  // constexpr std::string_view str{R"(ij int i = "bob";
+  // var j = 5+2 * (5+i))"};
+
+  constexpr std::string_view str{"3 * (2+-4)^4"};
+
+  auto string_to_parse = str;
+
+  parser_test::Parser parser;
+  while (!string_to_parse.empty()) {
+    auto str = parser.lexer(string_to_parse);
+    if (!str) {
+      std::cout << "Unmatched: '" << string_to_parse << "'\n";
+      return EXIT_FAILURE;
+    }
+    std::cout << '\'' << str->match << "' '" << str->remainder << "'\n";
+    string_to_parse = str->remainder;
+  }
 }
