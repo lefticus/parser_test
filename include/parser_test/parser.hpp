@@ -2,10 +2,21 @@
 #define PARSER_TEST_PARSER_HPP
 
 #include <array>
-#include <ctre.hpp>
 #include <iostream>
 #include <optional>
 #include <utility>
+#include <cstdint>
+#include <iterator>
+#include <string_view>
+#include <ctre.hpp>
+
+// references
+// http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
+// https://github.com/munificent/bantam/tree/master/src/com/stuffwithstuff/bantam
+// https://github.com/MattDiesel/cpp-pratt
+// https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+// https://eli.thegreenplace.net/2010/01/02/top-down-operator-precedence-parsing
+// https://stackoverflow.com/questions/380455/looking-for-a-clear-definition-of-what-a-tokenizer-parser-and-lexers-are
 
 
 namespace parser_test {
@@ -13,7 +24,7 @@ namespace parser_test {
 template <std::size_t N1, std::size_t N2>
 constexpr auto operator+(const ctll::fixed_string<N1> &lhs,
                          const ctll::fixed_string<N2> &rhs) {
-  char32_t result[N1 + N2 + 1]{};
+  char32_t result[N1 + N2 - 1]{};
 
   auto iter = std::begin(result);
   iter = std::copy(lhs.begin(), lhs.end(), iter);
@@ -43,18 +54,127 @@ struct Parser {
     colon,
     string,
     whitespace,
-    semicolon
+    semicolon,
+    end_of_file
   };
 
   struct lex_item {
-    Type type;
+    Type type{Type::unknown};
     std::string_view match;
     std::string_view remainder;
   };
 
+
+  lex_item token;
+  
+  
+
+  constexpr auto parse(std::string_view v) {
+    token = next_token(v);
+    return expression();
+  }
+
+  constexpr void match(const Type type) {
+    if (token.type != type) {
+      throw std::runtime_error("uhoh");
+    }
+    token = next();
+  }
+
+  constexpr double nud(const lex_item &item)
+  {
+    switch(item.type) {
+      case Type::number:
+        return std::stod(std::string{item.match});
+      case Type::plus:
+        return expression(100);
+      case Type::minus:
+        return -expression(100);
+      case Type::left_paren: {
+        const auto result = expression();
+        match(Type::right_paren);
+        return result;
+      }
+      default:
+        throw std::runtime_error("Unhandled nud");
+    };
+  }
+
+  constexpr double led(const lex_item &item, const double left)
+  {
+    switch(item.type) {
+      case Type::plus:
+        return left + expression(10);
+      case Type::minus:
+        return left - expression(10);
+      case Type::asterisk:
+        return left * expression(20);
+      case Type::slash:
+        return left / expression(20);
+      case Type::caret:
+        return std::pow(left, expression(30-1));
+      default:
+        throw std::runtime_error("Unhandled led");
+    }
+  }
+
+  static constexpr auto lbp(const Type type) {
+    switch(type) {
+      case Type::plus: return 10;
+      case Type::minus: return 10;
+      case Type::asterisk: return 20;
+      case Type::slash: return 20;
+      case Type::caret: return 30;
+      case Type::left_paren: return 0;
+      case Type::right_paren: return 0;
+      case Type::end_of_file: return 0;
+      default:
+        throw std::runtime_error(fmt::format("Unhandled value lbp {}", static_cast<int>(type)));
+    }
+
+  }
+
+  constexpr double expression(int rbp = 0)
+  {
+    const auto prefix = token;
+    token = next();
+    auto left = nud(prefix);
+
+    while (rbp < lbp(token.type)) {
+      const auto t = token;
+      token = next();
+      left = led(t, left);
+    }
+
+    return left;
+  }
+
+  constexpr lex_item next() noexcept {
+    return next_token(token.remainder);
+  }
+
+  static constexpr lex_item next_token(std::string_view v) noexcept {
+    while (true) {
+      if (const auto item = lexer(v); item) {
+        if (item->type != Type::whitespace) {
+          return *item;
+        } else {
+          v = item->remainder;
+        }
+      } else {
+        return lex_item{Type::unknown, v, v};
+      }
+    }
+  }
+
   static constexpr std::optional<lex_item> lexer(std::string_view v) noexcept {
     // prefix with ^ so that the regex search only matches the start of the
-    // string Hana assures me this is effecient ;)
+    // string Hana assures me this is efficient ;)
+
+    if (v.empty()) {
+      return lex_item{Type::end_of_file, v, v};
+    }
+
     constexpr auto make_token = [](const auto &s) {
       return ctll::fixed_string{"^"} + ctll::fixed_string{s};
     };
@@ -89,16 +209,18 @@ struct Parser {
       }
     }
 
-    if (auto result = ctre::search<identifier>(v); result) {
-      return ret(Type::identifier, result);
-    } else if (auto result = ctre::search<quoted_string>(v); result) {
-      return ret(Type::string, result);
-    } else if (auto result = ctre::search<number>(v); result) {
-      return ret(Type::number, result);
+    if (auto id_result = ctre::search<identifier>(v); id_result) {
+      return ret(Type::identifier, id_result);
+    } else if (auto string_result = ctre::search<quoted_string>(v); string_result) {
+      return ret(Type::string, string_result);
+    } else if (auto number_result = ctre::search<number>(v); number_result) {
+      return ret(Type::number, number_result);
     }
 
     return std::nullopt;
   }
+
+
 };
 }
 

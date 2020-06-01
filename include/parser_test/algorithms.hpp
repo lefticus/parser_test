@@ -7,8 +7,13 @@
 #include <string_view>
 
 namespace parser_test {
+
+template<typename T>
+constexpr bool BiDirIterator = std::is_convertible_v<typename std::iterator_traits<T>::iterator_category, std::bidirectional_iterator_tag>;
+
+
 template<typename Iterator, typename UnaryPredicate>
-[[nodiscard]] constexpr auto count_if_to_last(Iterator begin, Iterator end, UnaryPredicate predicate)
+[[nodiscard]] constexpr auto count_if_to_last(Iterator begin, Iterator end, UnaryPredicate predicate) requires BiDirIterator<Iterator>
 {
   std::reverse_iterator rbegin{ end };
   const std::reverse_iterator rend{ begin };
@@ -16,7 +21,7 @@ template<typename Iterator, typename UnaryPredicate>
   const auto last_item = std::find_if(rbegin, rend, predicate);
   const auto count = std::count_if(last_item, rend, predicate);
 
-  return std::pair{ count, last_item.base() };
+  return std::pair{ count, std::prev(last_item.base()) };
 }
 
 template<typename Iterator, typename Value>
