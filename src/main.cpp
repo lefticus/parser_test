@@ -41,7 +41,7 @@ int main(int argc, const char **argv)
   // constexpr std::string_view str{R"(ij int i = "bob";
   // var j = 5+2 * (5+i))"};
 
-  constexpr std::string_view str{"3 * (2+\n-+-4)^4"};
+  constexpr std::string_view str{"3 * (2+-4)^4 + 3! - 1"};
 
   auto string_to_parse = str;
 
@@ -64,6 +64,6 @@ int main(int argc, const char **argv)
     string_to_parse = parsed.remainder;
   }
 
-  fmt::print(" {} = {} ", str, parser.parse(str));
+  fmt::print(" {} = {} \n", str, parser.parse(str));
 }
 
